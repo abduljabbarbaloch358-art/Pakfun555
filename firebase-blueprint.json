@@ -1,0 +1,196 @@
+{
+  "entities": {
+    "UserAccount": {
+      "title": "UserAccount",
+      "description": "Player wallet, VIP progression, referral metrics, and account status (PII isolated in private subcollection).",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "balance": { "type": "number" },
+        "bonusBalance": { "type": "number" },
+        "vipTier": { "type": "string", "enum": ["Bronze", "Silver", "Gold", "Platinum", "Diamond"] },
+        "vipPoints": { "type": "number" },
+        "totalWagered": { "type": "number" },
+        "totalDeposited": { "type": "number" },
+        "totalWithdrawn": { "type": "number" },
+        "referralCode": { "type": "string", "minLength": 4, "maxLength": 24, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "referredBy": { "type": "string", "maxLength": 24 },
+        "referralCount": { "type": "number" },
+        "referralEarnings": { "type": "number" },
+        "kycStatus": { "type": "string", "enum": ["unverified", "pending", "verified", "rejected"] },
+        "withdrawPasswordHash": { "type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[a-f0-9]{64}$" },
+        "lastBetId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "lastDailyClaim": { "type": "string", "maxLength": 64 },
+        "streakDays": { "type": "number" },
+        "fraudScore": { "type": "number" },
+        "isFrozen": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "balance", "bonusBalance", "vipTier", "vipPoints", "totalWagered", "referralCode", "kycStatus", "streakDays", "fraudScore", "isFrozen", "createdAt", "updatedAt"]
+    },
+    "KycProfile": {
+      "title": "KycProfile",
+      "description": "Isolated PII and KYC identity verification records for a player.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "fullName": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "email": { "type": "string", "maxLength": 160 },
+        "phone": { "type": "string", "minLength": 6, "maxLength": 32 },
+        "documentType": { "type": "string", "enum": ["CNIC", "Passport", "DrivingLicense", "Aadhaar"] },
+        "documentNumber": { "type": "string", "minLength": 4, "maxLength": 48 },
+        "country": { "type": "string", "minLength": 2, "maxLength": 64 },
+        "address": { "type": "string", "minLength": 4, "maxLength": 240 },
+        "status": { "type": "string", "enum": ["pending", "verified", "rejected"] },
+        "reviewNote": { "type": "string", "maxLength": 300 },
+        "submittedAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "fullName", "email", "phone", "documentType", "documentNumber", "country", "address", "status", "submittedAt", "updatedAt"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Deposit, withdrawal, referral bonus, or daily reward transaction record.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userName": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "type": { "type": "string", "enum": ["deposit", "withdrawal", "bonus", "referral"] },
+        "method": { "type": "string", "enum": ["EasyPaisa", "JazzCash", "Local Bank Transfer", "UPI", "Net Banking", "Cryptocurrency", "Platform Reward"] },
+        "amount": { "type": "number" },
+        "fee": { "type": "number" },
+        "netAmount": { "type": "number" },
+        "currency": { "type": "string", "enum": ["PKR", "INR", "USDT", "USD"] },
+        "accountDetails": { "type": "string", "minLength": 2, "maxLength": 160 },
+        "referenceId": { "type": "string", "minLength": 3, "maxLength": 80 },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected", "flagged"] },
+        "fraudFlag": { "type": "boolean" },
+        "adminNote": { "type": "string", "maxLength": 300 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "userName", "type", "method", "amount", "fee", "netAmount", "currency", "accountDetails", "referenceId", "status", "fraudFlag", "createdAt", "updatedAt"]
+    },
+    "GameRecord": {
+      "title": "GameRecord",
+      "description": "Immutable game wager and settlement record.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userName": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "game": {
+          "type": "string",
+          "enum": [
+            "aviator", "wheel", "slots", "roulette", "poker",
+            "chicken-road", "lucky-dice", "big-small", "teen-patti", "jili-cards", "cricket"
+          ]
+        },
+        "betAmount": { "type": "number" },
+        "multiplier": { "type": "number" },
+        "payout": { "type": "number" },
+        "profit": { "type": "number" },
+        "outcome": { "type": "string", "enum": ["win", "loss", "cashout"] },
+        "details": { "type": "string", "maxLength": 240 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "userName", "game", "betAmount", "multiplier", "payout", "profit", "outcome", "details", "createdAt"]
+    },
+    "SupportTicket": {
+      "title": "SupportTicket",
+      "description": "24/7 customer support ticket with bounded message thread.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userName": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "subject": { "type": "string", "minLength": 3, "maxLength": 120 },
+        "category": { "type": "string", "enum": ["Deposit", "Withdrawal", "KYC", "Game Issue", "Account Security"] },
+        "status": { "type": "string", "enum": ["open", "in_progress", "resolved"] },
+        "messages": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "userName", "subject", "category", "status", "messages", "createdAt", "updatedAt"]
+    },
+    "FraudAlert": {
+      "title": "FraudAlert",
+      "description": "Automated fraud detection and risk monitoring alert.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userName": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "reason": { "type": "string", "minLength": 3, "maxLength": 200 },
+        "severity": { "type": "string", "enum": ["low", "medium", "high"] },
+        "status": { "type": "string", "enum": ["open", "reviewed", "dismissed"] },
+        "details": { "type": "string", "maxLength": 300 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "userName", "reason", "severity", "status", "details", "createdAt", "updatedAt"]
+    },
+    "AdminRole": {
+      "title": "AdminRole",
+      "description": "Trusted admin marker document.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "assignedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "assignedAt"]
+    },
+    "PaymentGatewaySettings": {
+      "title": "PaymentGatewaySettings",
+      "description": "Admin-configurable receiving accounts for player deposits across EasyPaisa, JazzCash, Bank, UPI, Net Banking, and USDT.",
+      "type": "object",
+      "properties": {
+        "easypaisaAccount": { "type": "string", "minLength": 3, "maxLength": 160 },
+        "jazzcashAccount": { "type": "string", "minLength": 3, "maxLength": 160 },
+        "bankAccount": { "type": "string", "minLength": 3, "maxLength": 160 },
+        "upiId": { "type": "string", "minLength": 3, "maxLength": 160 },
+        "netBankingInfo": { "type": "string", "minLength": 3, "maxLength": 160 },
+        "cryptoWallet": { "type": "string", "minLength": 3, "maxLength": 160 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["easypaisaAccount", "jazzcashAccount", "bankAccount", "upiId", "netBankingInfo", "cryptoWallet", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserAccount" },
+      "description": "Player wallet and gaming progression data, restricted to owner or admin."
+    },
+    "/users/{userId}/private/{docId}": {
+      "schema": { "$ref": "#/entities/KycProfile" },
+      "description": "Isolated KYC PII document for the player."
+    },
+    "/transactions/{txId}": {
+      "schema": { "$ref": "#/entities/Transaction" },
+      "description": "Deposit, withdrawal, bonus, and referral ledger entries."
+    },
+    "/gameHistory/{betId}": {
+      "schema": { "$ref": "#/entities/GameRecord" },
+      "description": "Immutable game bet and payout history."
+    },
+    "/supportTickets/{ticketId}": {
+      "schema": { "$ref": "#/entities/SupportTicket" },
+      "description": "24/7 customer support tickets and replies."
+    },
+    "/fraudAlerts/{alertId}": {
+      "schema": { "$ref": "#/entities/FraudAlert" },
+      "description": "Fraud prevention alerts reviewed by administrators."
+    },
+    "/admins/{userId}": {
+      "schema": { "$ref": "#/entities/AdminRole" },
+      "description": "Administrator privilege registry."
+    },
+    "/platformSettings/{settingId}": {
+      "schema": { "$ref": "#/entities/PaymentGatewaySettings" },
+      "description": "Platform configuration including admin receiving payment accounts."
+    }
+  }
+}

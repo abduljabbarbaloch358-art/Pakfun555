@@ -1,0 +1,10 @@
+node_modules
+dist
+build
+.git
+.aistudio
+public/assets/aistudio
+*.log
+.env
+.env.*
+!.env.example

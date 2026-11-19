@@ -1,0 +1,6 @@
+{
+  "name": "PAKFUN",
+  "description": "PAKFUN Real-Money Casino & Multiplayer Gaming Platform featuring Aviator Crash, Lucky Wheel, Slots, Roulette, Poker, multi-gateway payments, VIP tiers, KYC, and Admin console.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

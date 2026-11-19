@@ -1,0 +1,522 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Authenticated connection check document
+    match /test/connection {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    // Hardened Primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isPlayerAccount() {
+      return isSignedIn() && (
+        request.auth.token.email_verified == true ||
+        (request.auth.token.email is string && request.auth.token.email.matches('^[0-9]{10,15}@mobile\\.pakfun\\.app$'))
+      );
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isVerifiedUser() && (
+        (request.auth.token.email == 'abduljabbarbaloch358@gmail.com') ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // Validation Blueprints
+    function isValidUserAccount(data) {
+      return data.keys().hasAll([
+          'uid', 'displayName', 'balance', 'bonusBalance', 'vipTier',
+          'vipPoints', 'totalWagered', 'totalDeposited', 'totalWithdrawn',
+          'referralCode', 'referralCount', 'referralEarnings',
+          'kycStatus', 'streakDays', 'fraudScore', 'isFrozen', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid', 'displayName', 'balance', 'bonusBalance', 'vipTier',
+          'vipPoints', 'totalWagered', 'totalDeposited', 'totalWithdrawn',
+          'referralCode', 'referredBy', 'referralCount', 'referralEarnings',
+          'kycStatus', 'withdrawPasswordHash', 'lastBetId', 'lastDailyClaim', 'streakDays', 'fraudScore', 'isFrozen',
+          'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.uid)
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 64
+        && data.balance is number && data.balance >= 0 && data.balance <= 100000000
+        && data.bonusBalance is number && data.bonusBalance >= 0 && data.bonusBalance <= 100000000
+        && data.vipTier in ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond']
+        && data.vipPoints is number && data.vipPoints >= 0
+        && data.totalWagered is number && data.totalWagered >= 0
+        && data.totalDeposited is number && data.totalDeposited >= 0
+        && data.totalWithdrawn is number && data.totalWithdrawn >= 0
+        && data.referralCode is string && data.referralCode.size() >= 4 && data.referralCode.size() <= 24 && data.referralCode.matches('^[a-zA-Z0-9_\\-]+$')
+        && (!('referredBy' in data) || (data.referredBy is string && data.referredBy.size() <= 24))
+        && data.referralCount is number && data.referralCount >= 0
+        && data.referralEarnings is number && data.referralEarnings >= 0
+        && data.kycStatus in ['unverified', 'pending', 'verified', 'rejected']
+        && (!('withdrawPasswordHash' in data) || (data.withdrawPasswordHash is string && data.withdrawPasswordHash.size() == 64 && data.withdrawPasswordHash.matches('^[a-f0-9]{64}$')))
+        && (!('lastBetId' in data) || isValidId(data.lastBetId))
+        && (!('lastDailyClaim' in data) || (data.lastDailyClaim is string && data.lastDailyClaim.size() <= 64))
+        && data.streakDays is number && data.streakDays >= 0 && data.streakDays <= 3650
+        && data.fraudScore is number && data.fraudScore >= 0 && data.fraudScore <= 100
+        && data.isFrozen is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidKycProfile(data) {
+      return data.keys().hasAll([
+          'uid', 'fullName', 'email', 'phone', 'documentType',
+          'documentNumber', 'country', 'address', 'status', 'submittedAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid', 'fullName', 'email', 'phone', 'documentType',
+          'documentNumber', 'country', 'address', 'status', 'reviewNote', 'submittedAt', 'updatedAt'
+        ])
+        && isValidId(data.uid)
+        && data.fullName is string && data.fullName.size() >= 2 && data.fullName.size() <= 120
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 160
+        && data.phone is string && data.phone.size() >= 6 && data.phone.size() <= 32
+        && data.documentType in ['CNIC', 'Passport', 'DrivingLicense', 'Aadhaar']
+        && data.documentNumber is string && data.documentNumber.size() >= 4 && data.documentNumber.size() <= 48
+        && data.country is string && data.country.size() >= 2 && data.country.size() <= 64
+        && data.address is string && data.address.size() >= 4 && data.address.size() <= 240
+        && data.status in ['pending', 'verified', 'rejected']
+        && (!('reviewNote' in data) || (data.reviewNote is string && data.reviewNote.size() <= 300))
+        && data.submittedAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidTransaction(data) {
+      return data.keys().hasAll([
+          'id', 'userId', 'userName', 'type', 'method', 'amount', 'fee',
+          'netAmount', 'currency', 'accountDetails', 'referenceId', 'status',
+          'fraudFlag', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'userId', 'userName', 'type', 'method', 'amount', 'fee',
+          'netAmount', 'currency', 'accountDetails', 'referenceId', 'status',
+          'fraudFlag', 'adminNote', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && isValidId(data.userId)
+        && data.userName is string && data.userName.size() >= 1 && data.userName.size() <= 64
+        && data.type in ['deposit', 'withdrawal', 'bonus', 'referral']
+        && data.method in ['EasyPaisa', 'JazzCash', 'Local Bank Transfer', 'UPI', 'Net Banking', 'Cryptocurrency', 'Platform Reward']
+        && data.amount is number && data.amount > 0 && data.amount <= 50000000
+        && data.fee is number && data.fee >= 0 && data.fee <= 5000000
+        && data.netAmount is number && data.netAmount >= 0 && data.netAmount <= 50000000
+        && data.currency in ['PKR', 'INR', 'USDT', 'USD']
+        && data.accountDetails is string && data.accountDetails.size() >= 2 && data.accountDetails.size() <= 160
+        && data.referenceId is string && data.referenceId.size() >= 3 && data.referenceId.size() <= 80
+        && data.status in ['pending', 'approved', 'rejected', 'flagged']
+        && data.fraudFlag is bool
+        && (!('adminNote' in data) || (data.adminNote is string && data.adminNote.size() <= 300))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidGameRecord(data) {
+      return data.keys().hasAll([
+          'id', 'userId', 'userName', 'game', 'betAmount',
+          'multiplier', 'payout', 'profit', 'outcome', 'details', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'userId', 'userName', 'game', 'betAmount',
+          'multiplier', 'payout', 'profit', 'outcome', 'details', 'createdAt'
+        ])
+        && isValidId(data.id)
+        && isValidId(data.userId)
+        && data.userName is string && data.userName.size() >= 1 && data.userName.size() <= 64
+        && data.game in [
+          'aviator', 'wheel', 'slots', 'roulette', 'poker',
+          'chicken-road', 'lucky-dice', 'big-small', 'teen-patti', 'jili-cards', 'cricket'
+        ]
+        && data.betAmount is number && data.betAmount > 0 && data.betAmount <= 100000
+        && data.multiplier is number && data.multiplier >= 0 && data.multiplier <= 100
+        && data.payout is number && data.payout >= 0 && data.payout <= (data.betAmount * data.multiplier) + (data.betAmount * 0.02) + 1
+        && data.profit is number && data.profit >= (-data.betAmount - 0.05) && data.profit <= (data.payout - data.betAmount + 0.05)
+        && data.outcome in ['win', 'loss', 'cashout']
+        && data.details is string && data.details.size() <= 240
+        && data.createdAt is timestamp;
+    }
+
+    function isValidSupportTicket(data) {
+      return data.keys().hasAll([
+          'id', 'userId', 'userName', 'subject', 'category',
+          'status', 'messages', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'userId', 'userName', 'subject', 'category',
+          'status', 'messages', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && isValidId(data.userId)
+        && data.userName is string && data.userName.size() >= 1 && data.userName.size() <= 64
+        && data.subject is string && data.subject.size() >= 3 && data.subject.size() <= 120
+        && data.category in ['Deposit', 'Withdrawal', 'KYC', 'Game Issue', 'Account Security']
+        && data.status in ['open', 'in_progress', 'resolved']
+        && data.messages is list && data.messages.size() >= 1 && data.messages.size() <= 50
+        && data.messages[0] is map
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidFraudAlert(data) {
+      return data.keys().hasAll([
+          'id', 'userId', 'userName', 'reason', 'severity', 'status', 'details', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'userId', 'userName', 'reason', 'severity', 'status', 'details', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && isValidId(data.userId)
+        && data.userName is string && data.userName.size() >= 1 && data.userName.size() <= 64
+        && data.reason is string && data.reason.size() >= 3 && data.reason.size() <= 200
+        && data.severity in ['low', 'medium', 'high']
+        && data.status in ['open', 'reviewed', 'dismissed']
+        && data.details is string && data.details.size() <= 300
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidPaymentGatewaySettings(data) {
+      return data.keys().hasAll([
+          'easypaisaAccount', 'jazzcashAccount', 'bankAccount',
+          'upiId', 'netBankingInfo', 'cryptoWallet', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'easypaisaAccount', 'jazzcashAccount', 'bankAccount',
+          'upiId', 'netBankingInfo', 'cryptoWallet', 'updatedAt'
+        ])
+        && data.easypaisaAccount is string && data.easypaisaAccount.size() >= 3 && data.easypaisaAccount.size() <= 160
+        && data.jazzcashAccount is string && data.jazzcashAccount.size() >= 3 && data.jazzcashAccount.size() <= 160
+        && data.bankAccount is string && data.bankAccount.size() >= 3 && data.bankAccount.size() <= 160
+        && data.upiId is string && data.upiId.size() >= 3 && data.upiId.size() <= 160
+        && data.netBankingInfo is string && data.netBankingInfo.size() >= 3 && data.netBankingInfo.size() <= 160
+        && data.cryptoWallet is string && data.cryptoWallet.size() >= 3 && data.cryptoWallet.size() <= 160
+        && data.updatedAt is timestamp;
+    }
+
+    // /users/{userId}
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin();
+
+      allow create: if isPlayerAccount()
+        && isValidId(userId)
+        && isOwner(userId)
+        && isValidUserAccount(incoming())
+        && incoming().uid == userId
+        && incoming().kycStatus == 'unverified'
+        && incoming().fraudScore == 0
+        && incoming().isFrozen == false
+        && incoming().vipTier == 'Bronze'
+        && incoming().balance == 0
+        && incoming().bonusBalance == 100
+        && incoming().totalDeposited == 0
+        && incoming().totalWithdrawn == 0
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if (isPlayerAccount() || isAdmin())
+        && isValidId(userId)
+        && isValidUserAccount(incoming())
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            isOwner(userId)
+            && !existing().isFrozen
+            && incoming().isFrozen == existing().isFrozen
+            && incoming().fraudScore == existing().fraudScore
+            && incoming().totalDeposited == existing().totalDeposited
+            && incoming().totalWithdrawn == existing().totalWithdrawn
+            && incoming().referralCode == existing().referralCode
+            && incoming().referralCount == existing().referralCount
+            && (
+              // 1. Profile display name & Withdraw PIN setup/update only
+              (
+                incoming().kycStatus == existing().kycStatus
+                && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'withdrawPasswordHash', 'updatedAt'])
+              ) ||
+              // 2. KYC submission state transition (with atomic private/kyc doc)
+              (
+                existing().kycStatus != 'verified'
+                && incoming().kycStatus == 'pending'
+                && existsAfter(/databases/$(database)/documents/users/$(userId)/private/kyc)
+                && incoming().diff(existing()).affectedKeys().hasOnly(['kycStatus', 'updatedAt'])
+              ) ||
+              // 3. Withdrawal lock (can only decrease balance with Withdraw PIN configured)
+              (
+                incoming().kycStatus == existing().kycStatus
+                && ('withdrawPasswordHash' in existing())
+                && incoming().balance < existing().balance
+                && incoming().balance >= 0
+                && incoming().balance >= existing().balance - 100000
+                && incoming().diff(existing()).affectedKeys().hasOnly(['balance', 'updatedAt'])
+              ) ||
+              // 4. Daily streak reward claim (bounded strictly to VIP max schedule)
+              (
+                incoming().kycStatus == existing().kycStatus
+                && incoming().streakDays == existing().streakDays + 1
+                && ('lastDailyClaim' in incoming())
+                && (!('lastDailyClaim' in existing()) || incoming().lastDailyClaim != existing().lastDailyClaim)
+                && incoming().bonusBalance > existing().bonusBalance
+                && incoming().bonusBalance <= existing().bonusBalance + 2500
+                && incoming().diff(existing()).affectedKeys().hasOnly(['bonusBalance', 'lastDailyClaim', 'streakDays', 'updatedAt'])
+              ) ||
+              // 5. One-time referral code activation (cannot self-refer)
+              (
+                incoming().kycStatus == existing().kycStatus
+                && !('referredBy' in existing())
+                && ('referredBy' in incoming())
+                && incoming().referredBy is string
+                && incoming().referredBy != existing().referralCode
+                && incoming().bonusBalance == existing().bonusBalance + 250
+                && incoming().referralEarnings == existing().referralEarnings + 250
+                && incoming().diff(existing()).affectedKeys().hasOnly(['referredBy', 'bonusBalance', 'referralEarnings', 'updatedAt'])
+              ) ||
+              // 6. Atomic game wager settlement (must match batch-created gameHistory/{lastBetId})
+              (
+                incoming().kycStatus == existing().kycStatus
+                && ('lastBetId' in incoming())
+                && (!('lastBetId' in existing()) || incoming().lastBetId != existing().lastBetId)
+                && existsAfter(/databases/$(database)/documents/gameHistory/$(incoming().lastBetId))
+                && getAfter(/databases/$(database)/documents/gameHistory/$(incoming().lastBetId)).data.userId == userId
+                && getAfter(/databases/$(database)/documents/gameHistory/$(incoming().lastBetId)).data.betAmount <= (existing().balance + existing().bonusBalance + 0.01)
+                && (incoming().balance + incoming().bonusBalance) <= (existing().balance + existing().bonusBalance + getAfter(/databases/$(database)/documents/gameHistory/$(incoming().lastBetId)).data.profit + 0.05)
+                && incoming().totalWagered >= existing().totalWagered
+                && incoming().totalWagered <= existing().totalWagered + getAfter(/databases/$(database)/documents/gameHistory/$(incoming().lastBetId)).data.betAmount + 0.05
+                && incoming().vipPoints >= existing().vipPoints
+                && incoming().vipPoints <= existing().vipPoints + (getAfter(/databases/$(database)/documents/gameHistory/$(incoming().lastBetId)).data.betAmount * 0.1) + 1
+                && incoming().diff(existing()).affectedKeys().hasOnly([
+                  'balance', 'bonusBalance', 'vipTier', 'vipPoints', 'totalWagered', 'lastBetId', 'updatedAt'
+                ])
+              )
+            )
+          )
+        );
+
+      allow delete: if false;
+
+      // Isolated PII / KYC subcollection
+      match /private/{docId} {
+        allow get: if isSignedIn() && isValidId(userId) && isValidId(docId) && (isOwner(userId) || isAdmin());
+        allow list: if isSignedIn() && (isOwner(userId) || isAdmin());
+
+        allow create: if isPlayerAccount()
+          && isValidId(userId)
+          && isValidId(docId)
+          && isOwner(userId)
+          && docId == 'kyc'
+          && isValidKycProfile(incoming())
+          && incoming().uid == userId
+          && incoming().status == 'pending'
+          && incoming().submittedAt == request.time
+          && incoming().updatedAt == request.time;
+
+        allow update: if (isPlayerAccount() || isAdmin())
+          && isValidId(userId)
+          && isValidId(docId)
+          && docId == 'kyc'
+          && isValidKycProfile(incoming())
+          && incoming().uid == existing().uid
+          && incoming().submittedAt == existing().submittedAt
+          && incoming().updatedAt == request.time
+          && (
+            isAdmin() ||
+            (
+              isOwner(userId)
+              && existing().status != 'verified'
+              && incoming().status == 'pending'
+              && incoming().diff(existing()).affectedKeys().hasOnly([
+                'fullName', 'email', 'phone', 'documentType', 'documentNumber',
+                'country', 'address', 'status', 'updatedAt'
+              ])
+            )
+          );
+
+        allow delete: if false;
+      }
+    }
+
+    // /transactions/{txId}
+    match /transactions/{txId} {
+      allow get: if isSignedIn() && isValidId(txId) && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+
+      allow create: if (isPlayerAccount() || isAdmin())
+        && isValidId(txId)
+        && isValidTransaction(incoming())
+        && incoming().id == txId
+        && incoming().userId == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            incoming().status == 'pending'
+            && incoming().type == 'deposit'
+            && incoming().amount > 0 && incoming().amount <= 50000
+            && incoming().fee <= incoming().amount
+            && incoming().netAmount <= incoming().amount
+          ) ||
+          (
+            incoming().status == 'pending'
+            && incoming().type == 'withdrawal'
+            && incoming().amount > 0 && incoming().amount <= 100000
+            && incoming().fee <= incoming().amount
+            && incoming().netAmount <= incoming().amount
+            && ('withdrawPasswordHash' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data)
+            && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.balance <= (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.balance - incoming().amount + 0.05)
+          ) ||
+          (
+            incoming().status == 'approved'
+            && incoming().type == 'bonus'
+            && incoming().amount > 0 && incoming().amount <= 2500
+            && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.streakDays == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.streakDays + 1
+          ) ||
+          (
+            incoming().status == 'approved'
+            && incoming().type == 'referral'
+            && incoming().amount == 250
+            && !('referredBy' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data)
+            && ('referredBy' in getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data)
+          )
+        );
+
+      allow update: if isAdmin()
+        && isValidId(txId)
+        && isValidTransaction(incoming())
+        && incoming().id == existing().id
+        && incoming().userId == existing().userId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'fraudFlag', 'adminNote', 'updatedAt']);
+
+      allow delete: if false;
+    }
+
+    // /gameHistory/{betId}
+    match /gameHistory/{betId} {
+      allow get: if isSignedIn() && isValidId(betId) && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+
+      allow create: if isPlayerAccount()
+        && isValidId(betId)
+        && isValidGameRecord(incoming())
+        && incoming().id == betId
+        && incoming().userId == request.auth.uid
+        && incoming().createdAt == request.time;
+
+      allow update, delete: if false;
+    }
+
+    // /supportTickets/{ticketId}
+    match /supportTickets/{ticketId} {
+      allow get: if isSignedIn() && isValidId(ticketId) && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+
+      allow create: if isPlayerAccount()
+        && isValidId(ticketId)
+        && isValidSupportTicket(incoming())
+        && incoming().id == ticketId
+        && incoming().userId == request.auth.uid
+        && incoming().status == 'open'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if (isPlayerAccount() || isAdmin())
+        && isValidId(ticketId)
+        && isValidSupportTicket(incoming())
+        && incoming().id == existing().id
+        && incoming().userId == existing().userId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            existing().userId == request.auth.uid
+            && existing().status != 'resolved'
+            && incoming().status == existing().status
+            && incoming().diff(existing()).affectedKeys().hasOnly(['messages', 'updatedAt'])
+          )
+        );
+
+      allow delete: if false;
+    }
+
+    // /fraudAlerts/{alertId}
+    match /fraudAlerts/{alertId} {
+      allow get: if isAdmin() && isValidId(alertId);
+      allow list: if isAdmin();
+
+      allow create: if (isPlayerAccount() || isAdmin())
+        && isValidId(alertId)
+        && isValidFraudAlert(incoming())
+        && incoming().id == alertId
+        && (isAdmin() || (incoming().userId == request.auth.uid && incoming().status == 'open'))
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isAdmin()
+        && isValidId(alertId)
+        && isValidFraudAlert(incoming())
+        && incoming().id == existing().id
+        && incoming().userId == existing().userId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'severity', 'details', 'updatedAt']);
+
+      allow delete: if false;
+    }
+
+    // /admins/{userId}
+    match /admins/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin();
+      allow create, update, delete: if isAdmin() && isValidId(userId);
+    }
+
+    // /platformSettings/{settingId}
+    match /platformSettings/{settingId} {
+      allow get: if isSignedIn() && isValidId(settingId) && settingId == 'paymentGateways';
+      allow list: if isAdmin();
+      allow create, update: if isAdmin()
+        && isValidId(settingId)
+        && settingId == 'paymentGateways'
+        && isValidPaymentGatewaySettings(incoming())
+        && incoming().updatedAt == request.time;
+      allow delete: if false;
+    }
+  }
+}
